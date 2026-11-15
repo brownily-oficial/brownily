@@ -51,6 +51,12 @@ O cardápio é dividido em **seções**, cada uma separada no site e nas imagens
 
 Para mover um produto de uma seção para outra, peça ao Claude.
 
+## Desconto e etiqueta "Especial"
+
+A seção do Especial de fim de ano tem, no `dados.js`:
+- `desconto: { ativo: true, percentual: 20, ... }`: mostra o preço cheio riscado e o preço com desconto no site, nas imagens e no PDF, com selos de "20% OFF". Os preços no arquivo continuam os cheios. **Para encerrar a promoção:** peça "tira o desconto" (ou `ativo: false`).
+- `tag: "Especial"`: a etiqueta que aparece em todos os itens da seção. Para tirar: `tag: ""`.
+
 ## Regras rápidas
 
 - Esgotado: `esgotado: ["M"]` (só o M), `esgotado: ["P", "M"]` (sabor todo) ou `esgotado: []` (disponível).

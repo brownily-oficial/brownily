@@ -14,20 +14,24 @@ const POR_PAGINA = 3;
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const brl = v => { const n = Number(v); return "R$&nbsp;" + (n % 1 === 0 ? n : n.toFixed(2).replace(".", ",")); };
+const R = require("../regras.js");
 const fora = (x, k) => (x.esgotado || []).includes(k);
-// linhas de um item: P/M (tamanhos) ou "linhas" próprias (sabores / unidade única)
-const linhasDe = x => x.linhas
-  ? x.linhas.map(l => ({ key: l.id, rotulo: l.rotulo || "", desc: l.descricao || "", preco: l.preco, badge: "" }))
-  : TAM.map(s => ({ key: s, rotulo: "", preco: x.preco[s], badge: s }));
-const tudoFora = x => { const l = linhasDe(x); return l.length > 0 && l.every(r => fora(x, r.key)); };
+// marca cada item com o desconto e a etiqueta da sua seção
+D.colecoes.forEach(c => { const d = R.descontoDe(c); c.grupos.forEach(g => g.sabores.forEach(x => { x.__d = d; x.__tag = c.tag || ""; })); });
+// linhas de um item (P/M, sabores, ou sabor com P e G), já com o desconto calculado
+const linhasDe = x => R.linhas(x, D.tamanhos, x.__d);
+const tudoFora = x => { const l = linhasDe(x).filter(r => !r.head); return l.length > 0 && l.every(r => fora(x, r.key)); };
 const secoes = () => D.colecoes.filter(c => c.ativa !== false && c.grupos.some(g => g.sabores.length));
+const descCapa = () => { const c = D.colecoes.find(k => k.id === D.capa.colecao); return c && c.ativa !== false ? R.descontoDe(c) : null; };
+const selosCapa = () => { const d = descCapa(); return d ? `<div class="chip promo">${esc(R.textoDesconto(d))}${d.aviso ? " &middot; " + esc(d.aviso) : ""}</div>` : ""; };
 const menorPreco = () => {
   const alvo = secoes().filter(c => !D.capa.colecao || c.id === D.capa.colecao);
-  const rows = alvo.flatMap(c => c.grupos.flatMap(g => g.sabores.flatMap(x => linhasDe(x).filter(r => typeof r.preco === "number").map(r => ({ r, out: fora(x, r.key) })))));
-  const disp = rows.filter(o => !o.out).map(o => o.r.preco);
-  return Math.min(...(disp.length ? disp : rows.map(o => o.r.preco)));
+  const rows = alvo.flatMap(c => c.grupos.flatMap(g => g.sabores.flatMap(x => linhasDe(x).filter(r => !r.head && typeof r.pay === "number").map(r => ({ r, out: fora(x, r.key) })))));
+  const disp = rows.filter(o => !o.out).map(o => o.r.pay);
+  return Math.min(...(disp.length ? disp : rows.map(o => o.r.pay)));
 };
-const usaTamanhos = c => c.grupos.some(g => g.sabores.some(x => !x.linhas && !x.consultar));
+// a faixa "P aprox. 250g / M aprox. 600g" só aparece em páginas com itens de tamanho P/M
+const usaTamanhos = lista => lista.some(({ x }) => !x.linhas && !x.consultar);
 const temLogo = () => D.marca.logo && fs.existsSync(path.join(RAIZ, D.marca.logo));
 
 const marca = (cls = "") => temLogo()
@@ -73,10 +77,10 @@ h1,h2,h3{font-family:var(--fd);font-weight:400;margin:0;line-height:1}
 .cab .tams{display:flex;gap:12px}
 .cab .tams span{display:flex;align-items:center;gap:10px;background:var(--lilac);border-radius:999px;padding:7px 20px 7px 7px;font-weight:800;font-size:23px;color:var(--ink2)}
 .cab .tams i{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--ink2);color:#fff;font-style:normal;font-family:var(--fb);font-weight:900;font-size:22px}
-.lista{flex:1;padding:30px 70px 0;display:flex;flex-direction:column;gap:22px}
-.pill{align-self:flex-start;background:linear-gradient(120deg,var(--purple),var(--ink2));color:#fff;font-family:var(--fd);font-size:36px;padding:10px 34px 12px;border-radius:999px}
+.lista{flex:1;min-height:0;padding:26px 70px 0;display:flex;flex-direction:column;gap:18px}
+.pill{align-self:flex-start;display:flex;align-items:center;white-space:nowrap;background:linear-gradient(120deg,var(--purple),var(--ink2));color:#fff;font-family:var(--fd);font-size:36px;padding:10px 24px 12px 34px;border-radius:999px}
 .grupo{font-size:54px;color:var(--choc);margin:2px 0 -6px}
-.item{display:flex;min-height:380px;max-height:540px;flex:1 0 auto;background:#fff;border:3px solid var(--line);border-radius:36px;overflow:hidden;position:relative}
+.item{display:flex;min-height:330px;flex:1 0 auto;background:#fff;border:3px solid var(--line);border-radius:36px;overflow:hidden;position:relative}
 .item .m{position:relative;width:304px;align-self:stretch;flex:none;background:var(--choc2)}
 .item .m img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .item .tag{position:absolute;top:18px;left:18px;background:var(--purple);color:#fff;font-weight:900;font-size:22px;letter-spacing:.12em;text-transform:uppercase;padding:8px 18px;border-radius:999px;z-index:2}
@@ -102,6 +106,28 @@ h1,h2,h3{font-family:var(--fd);font-weight:400;margin:0;line-height:1}
 .pre .dt{font-size:22px;line-height:1.25;color:var(--muted);font-weight:600}
 .pre .v.sem{font-family:var(--fb);font-weight:800;font-size:22px;color:var(--muted);text-align:right;max-width:170px;line-height:1.15;margin-left:auto}
 .pre.desc .e{margin-left:0}
+.pre.duo{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:22px;row-gap:2px;align-items:center}
+.pre.duo .lb{font-size:32px;line-height:1.1;flex:none}
+.pre.duo .dt{grid-column:1/-1;font-size:23px;line-height:1.25;color:var(--muted);font-weight:600}
+.pre.duo .pzs{display:flex;gap:16px;flex:none}
+.pre.duo .pz{display:flex;align-items:center;gap:8px}
+.pre.duo .pz.off .v{color:#9b8f94;text-decoration:line-through}
+.pre.duo .pz .z{width:42px;height:42px;font-size:22px}
+.pre.duo .v{font-size:36px}
+.pre.duo .pw .old{font-size:19px}
+.pre.duo .pz .e{font-size:16px;padding:5px 10px}
+.pre.head{padding-top:12px}
+.pre.head + .pre{border-top:0;padding-top:4px}
+.pre.sizes .v{margin-left:0}
+.pre .pw{display:flex;flex-direction:column;line-height:1}
+.pre .pw .old{font-size:22px;font-weight:800;color:#8a7a72;text-decoration:line-through;text-decoration-thickness:2.5px}
+.item .offtag{position:absolute;bottom:18px;left:18px;background:var(--choc);color:#ffe9c7;border:3px solid #ffe9c7;font-weight:900;font-size:24px;letter-spacing:.05em;padding:6px 16px;border-radius:999px;z-index:2;box-shadow:0 6px 14px rgba(0,0,0,.3)}
+.chip.promo{background:#ffe9c7;color:var(--choc)}
+.capa .chips{display:flex;gap:14px;margin-top:44px;flex-wrap:wrap}
+.seal{position:absolute;top:-34px;right:-34px;width:210px;height:210px;border-radius:50%;background:#ffe9c7;color:var(--choc);display:grid;place-content:center;text-align:center;transform:rotate(10deg);box-shadow:0 18px 40px rgba(0,0,0,.45);border:9px solid var(--purple);line-height:1;z-index:2}
+.seal b{font-family:var(--fd);font-weight:400;font-size:72px}
+.seal span{font-weight:900;font-size:32px;letter-spacing:.12em}
+.pill .off{margin-left:18px;background:#ffe9c7;color:var(--choc);font-family:var(--fb);font-weight:900;font-size:21px;letter-spacing:.05em;text-transform:uppercase;padding:5px 14px;border-radius:999px}
 .item.out{background:#f1ebe3;border-color:#e3d9cb}
 .item.out .m img,.item.out .tile{filter:grayscale(1) opacity(.55)}
 .item.out h3,.item.out p{color:#9b8f94}
@@ -143,23 +169,28 @@ function paginaCapa() {
   const c = D.capa;
   return `<section class="pg marrom dots capa" data-nome="capa">
     <div class="rel">${marca()}</div>
-    ${c.selo && c.selo.ativo ? `<div class="rel" style="margin-top:44px"><span class="chip">${esc(c.selo.texto)}</span></div>` : ""}
+    <div class="chips rel">${c.selo && c.selo.ativo ? `<span class="chip">${esc(c.selo.texto)}</span>` : ""}${selosCapa().replace("div", "span").replace("/div", "/span")}</div>
     <h1 class="rel">${esc(c.titulo)} <span>${esc(c.destaque)}</span></h1>
     <p class="lede rel">${esc(c.frase)}</p>
-    <div class="foto rel"><img src="../${esc(c.foto)}" alt=""><div class="stamp">a partir de<strong>${brl(menorPreco())}</strong></div></div>
+    <div class="foto rel"><img src="../${esc(c.foto)}" alt=""><div class="stamp">a partir de<strong>${brl(menorPreco())}</strong></div>${descCapa() ? `<div class="seal"><b>${descCapa().percentual}%</b><span>OFF</span></div>` : ""}</div>
     <div class="rodape"><div><small>Peça pelo WhatsApp</small>${esc(D.contato.whatsappTexto)}</div></div>
   </section>`;
 }
 
 function linhaPreco(x, r) {
-  const off = fora(x, r.key);
-  const sem = typeof r.preco !== "number";
-  const preco = sem ? '<span class="v sem">Valor sob consulta</span>' : `<span class="v">${brl(r.preco)}</span>`;
-  if (r.desc) {   // sabor com descrição ao lado: nome + texto à esquerda, preço à direita
-    return `<div class="pre desc${off ? " off" : ""}"><div class="dl"><span class="lb">${esc(r.rotulo)}</span><span class="dt">${esc(r.desc)}</span></div>${preco}${off ? '<span class="e">Esgotado</span>' : ""}</div>`;
+  if (r.head) {   // cabeçalho de um sabor com P e G: nome + descrição, os preços vêm nas linhas seguintes
+    return `<div class="pre head"><div class="dl"><span class="lb">${esc(r.label)}</span>${r.desc ? `<span class="dt">${esc(r.desc)}</span>` : ""}</div></div>`;
   }
-  const esq = r.badge ? `<span class="z">${esc(r.badge)}</span>` : (r.rotulo ? `<span class="lb">${esc(r.rotulo)}</span>` : "");
-  return `<div class="pre${off ? " off" : ""}${r.badge ? "" : " var"}">${esq}${preco}${off ? '<span class="e">Esgotado</span>' : ""}</div>`;
+  const off = fora(x, r.key);
+  const sem = typeof r.price !== "number";
+  const preco = sem ? '<span class="v sem">Valor sob consulta</span>'
+    : r.off ? `<span class="pw"><s class="old">${brl(r.price)}</s><span class="v">${brl(r.pay)}</span></span>`
+    : `<span class="v">${brl(r.price)}</span>`;
+  if (r.desc) {   // sabor com descrição ao lado: nome + texto à esquerda, preço à direita
+    return `<div class="pre desc${off ? " off" : ""}"><div class="dl"><span class="lb">${esc(r.label)}</span><span class="dt">${esc(r.desc)}</span></div>${preco}${off ? '<span class="e">Esgotado</span>' : ""}</div>`;
+  }
+  const esq = r.badge ? `<span class="z">${esc(r.badge)}</span>` : (r.label ? `<span class="lb">${esc(r.label)}</span>` : "");
+  return `<div class="pre${off ? " off" : ""}${r.badge ? "" : " var"}${r.group !== undefined ? " sizes" : ""}">${esq}${preco}${off ? '<span class="e">Esgotado</span>' : ""}</div>`;
 }
 
 function item(x) {
@@ -167,9 +198,30 @@ function item(x) {
     ? `<img src="../${esc(x.foto)}" alt="">`
     : `<div class="tile ${esc(x.cartao || "leite")}"><span>${esc(x.nome)}</span></div>`;
   const out = tudoFora(x);
-  return `<div class="item${out ? " out" : ""}"><div class="m">${midia}${x.destaque ? `<span class="tag">${esc(x.destaque)}</span>` : ""}${out ? '<span class="selo-out">Esgotado</span>' : ""}</div>
+  const rotulo = x.destaque || x.__tag;
+  const selos = (rotulo ? `<span class="tag">${esc(rotulo)}</span>` : "") + (x.__d ? `<span class="offtag">${esc(R.textoDesconto(x.__d))}</span>` : "");
+  return `<div class="item${out ? " out" : ""}"><div class="m">${midia}${selos}${out ? '<span class="selo-out">Esgotado</span>' : ""}</div>
     <div class="t"><h3>${esc(x.nome)}</h3>${x.descricao ? `<p>${esc(x.descricao)}</p>` : ""}${
-      x.consultar || !linhasDe(x).length ? '<div class="pre"><span class="lb">Valor sob consulta</span></div>' : linhasDe(x).map(r => linhaPreco(x, r)).join("")}</div></div>`;
+      x.consultar || !linhasDe(x).length ? '<div class="pre"><span class="lb">Valor sob consulta</span></div>' : linhasHtml(x)}</div></div>`;
+}
+
+// Sabores com P e G (cabeçalho + 2 tamanhos) viram UMA linha: nome e descrição à esquerda, os dois preços à direita.
+function linhasHtml(x) {
+  const ls = linhasDe(x), out = [];
+  for (let i = 0; i < ls.length; i++) {
+    const r = ls[i];
+    if (!r.head) { out.push(linhaPreco(x, r)); continue; }
+    const filhas = [];
+    while (ls[i + 1] && !ls[i + 1].head && ls[i + 1].group !== undefined) filhas.push(ls[++i]);
+    const precos = filhas.map(f => {
+      const off = fora(x, f.key);
+      const v = typeof f.price !== "number" ? '<span class="v sem">consulta</span>'
+        : f.off ? `<span class="pw"><s class="old">${brl(f.price)}</s><span class="v">${brl(f.pay)}</span></span>` : `<span class="v">${brl(f.price)}</span>`;
+      return `<div class="pz${off ? " off" : ""}"><span class="z">${esc(f.badge)}</span>${v}${off ? '<span class="e">Esgotado</span>' : ""}</div>`;
+    }).join("");
+    out.push(`<div class="pre duo"><span class="lb">${esc(r.label)}</span><div class="pzs">${precos}</div>${r.desc ? `<span class="dt">${esc(r.desc)}</span>` : ""}</div>`);
+  }
+  return out.join("");
 }
 
 function paginasCardapio() {
@@ -180,8 +232,8 @@ function paginasCardapio() {
     c.grupos.forEach(g => g.sabores.forEach(x => itens.push({ c, g, x })));
     // reparte por igual entre as páginas (ex.: 5 itens = 3 + 2; 7 itens = 3 + 2 + 2)
     // itens com muitas linhas (ex.: Sobremesa com 3 sabores) "pesam" mais; cada página aceita até ~3 itens normais
-    const peso = x => linhasDe(x).filter(r => r.desc).length >= 2 ? 1.5 : (linhasDe(x).length >= 4 ? 1.25 : 1);
-    const CAP = 3.2;
+    const peso = x => { const l = linhasDe(x); return l.some(r => r.head) ? 1.45 : 1 + 0.125 * Math.max(0, l.length - 2); };
+    const CAP = 3.5;
     let atual = [], soma = 0;
     itens.forEach(it => {
       if (atual.length && soma + peso(it.x) > CAP) { paginas.push({ c, lista: atual }); atual = []; soma = 0; }
@@ -190,15 +242,19 @@ function paginasCardapio() {
     if (atual.length) paginas.push({ c, lista: atual });
   });
   const tams = `<div class="tams">${TAM.map(s => `<span><i>${s}</i>${esc(D.tamanhos[s])}</span>`).join("")}</div>`;
-  return paginas.map(({ c: sec, lista }, n) => {
+  return paginas.map(({ lista }, n) => {
     let corpo = "", col = null, grp = null;
     lista.forEach(({ c, g, x }) => {
-      if (c.id !== col) { corpo += `<div class="pill">${esc(c.titulo)}</div>`; col = c.id; grp = null; }
+      if (c.id !== col) {
+        const d = R.descontoDe(c);
+        corpo += `<div class="pill">${esc(c.titulo)}${d ? `<span class="off">${esc(R.textoDesconto(d))}${d.aviso ? " &middot; " + esc(d.aviso) : ""}</span>` : ""}</div>`;
+        col = c.id; grp = null;
+      }
       if (g.id !== grp) { if (g.titulo) corpo += `<h2 class="grupo">${esc(g.titulo)}</h2>`; grp = g.id; }
       corpo += item(x);
     });
     return `<section class="pg light" data-nome="cardapio-${n + 1}">
-      <div class="cab">${marca()}${usaTamanhos(sec) ? tams : ""}</div>
+      <div class="cab">${marca()}${usaTamanhos(lista) ? tams : ""}</div>
       <div class="lista">${corpo}</div>
       <div class="pe">Peça pelo WhatsApp <b>${esc(D.contato.whatsappTexto)}</b></div>
     </section>`;
@@ -223,7 +279,7 @@ function paginaInfo(urlCurta) {
 function paginaCompartilhar() {
   const c = D.capa;
   return `<section class="pg marrom dots" style="width:1200px;height:630px;flex-direction:row;align-items:center;padding:0 70px;gap:50px" data-nome="compartilhar">
-    <div class="rel" style="flex:1">${marca().replace('class="logo ', 'style="height:180px" class="logo ')}${c.selo && c.selo.ativo ? `<div style="margin-top:26px"><span class="chip" style="font-size:20px;padding:8px 20px">${esc(c.selo.texto)}</span></div>` : ""}
+    <div class="rel" style="flex:1">${marca().replace('class="logo ', 'style="height:180px" class="logo ')}${c.selo && c.selo.ativo ? `<div style="margin-top:26px;display:flex;gap:12px"><span class="chip" style="font-size:20px;padding:8px 20px">${esc(c.selo.texto)}</span>${descCapa() ? `<span class="chip promo" style="font-size:20px;padding:8px 20px">${esc(R.textoDesconto(descCapa()))}</span>` : ""}</div>` : ""}
       <h1 style="font-size:78px;line-height:1.1;margin-top:18px;color:var(--ondark)">${esc(c.titulo)}<br><span style="color:var(--lilac)">${esc(c.destaque)}</span></h1>
       <div style="margin-top:20px;font-size:30px;color:var(--ondark2);font-weight:800">Peça pelo WhatsApp &middot; ${esc(D.marca.cidade)}</div></div>
     <div class="rel" style="width:400px;flex:none"><img src="../${esc(c.foto)}" style="display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:36px;transform:rotate(3deg);box-shadow:0 30px 60px rgba(0,0,0,.5)" alt=""></div>
@@ -252,14 +308,14 @@ function atualizarIndex() {
   const html = fs.readFileSync(arq, "utf8")
     .replace(/<!--COMPARTILHAR-->[\s\S]*?<!--\/COMPARTILHAR-->/, bloco)
     // ?v=... faz o navegador baixar de novo sempre que algo muda (evita ver a versão antiga)
-    .replace(/(href="estilo\.css|src="dados\.js|src="app\.js)(\?v=\w+)?"/g, `$1?v=${versao}"`);
+    .replace(/(href="estilo\.css|src="regras\.js|src="dados\.js|src="app\.js)(\?v=\w+)?"/g, `$1?v=${versao}"`);
   fs.writeFileSync(arq, html);
 }
 
 // resumo (hash) dos arquivos que o site usa: muda quando qualquer um deles muda
 function versaoDosArquivos() {
   const h = require("crypto").createHash("md5");
-  const arqs = ["dados.js", "app.js", "estilo.css", D.marca.logo || "logo.png"];
+  const arqs = ["dados.js", "regras.js", "app.js", "estilo.css", D.marca.logo || "logo.png"];
   const andar = d => fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? andar(path.join(d, e.name)) : [path.join(d, e.name)]) : [];
   [...arqs.map(a => path.join(RAIZ, a)), ...andar(path.join(RAIZ, "fotos")).sort()].forEach(f => { if (fs.existsSync(f)) h.update(fs.readFileSync(f)); });
   return h.digest("hex").slice(0, 10);
@@ -294,7 +350,12 @@ async function gerarMateriais() {
     if (nome === "compartilhar") { await s.screenshot({ path: path.join(PASTA, "compartilhar.jpg"), type: "jpeg", quality: 86 }); continue; }
     n++;
     // aviso se o conteúdo de uma página não couber (evita item cortado nas imagens)
-    const estouro = await s.evaluate(el => { const l = el.querySelector(".lista"); return l ? l.scrollHeight - l.clientHeight : 0; });
+    const estouro = await s.evaluate(el => {
+      const l = el.querySelector(".lista"); if (!l) return 0;
+      const ultimo = [...l.children].pop().getBoundingClientRect().bottom;
+      const pe = el.querySelector(".pe").getBoundingClientRect();
+      return Math.max(l.scrollHeight - l.clientHeight, Math.round(ultimo - pe.top + 10), Math.round(pe.bottom - el.getBoundingClientRect().bottom));
+    });
     if (estouro > 2) console.warn(`ATENÇÃO: a página "${nome}" ficou ${estouro}px maior que o espaço. Confira a imagem.`);
     const f = `story-${String(n).padStart(2, "0")}-${nome}.png`;
     await s.screenshot({ path: path.join(PASTA, f) });

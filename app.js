@@ -2,8 +2,18 @@
 (function () {
   "use strict";
   var D = DADOS;
+  var R = REGRAS;
   var FEE = D.entrega.taxa;
   var cart = {};
+  // marca cada item com o desconto e a etiqueta da sua seção
+  D.colecoes.forEach(function (c) {
+    var d = R.descontoDe(c);
+    c.grupos.forEach(function (g) { g.sabores.forEach(function (x) { x.__d = d; x.__tag = c.tag || ""; }); });
+  });
+  function descCapa() {
+    var c = D.colecoes.filter(function (k) { return k.id === D.capa.colecao; })[0];
+    return c && c.ativa !== false ? R.descontoDe(c) : null;
+  }
   // versão dos arquivos (vem do ?v= deste script): garante que o navegador pegue sempre a versão nova
   var V = (function () { var s = document.currentScript, m = s && /[?&]v=(\w+)/.exec(s.src); return m ? m[1] : ""; })();
   function ver(p) { return V ? p + "?v=" + V : p; }
@@ -23,12 +33,12 @@
   function key(id, s) { return id + "|" + s; }
   function sizes() { return Object.keys(D.tamanhos); }
   // linhas de um item: P/M (tamanhos) ou as "linhas" próprias (sabores, unidade única...)
-  function rowsOf(x) {
-    if (x.linhas) return x.linhas.map(function (l) { return { key: l.id, label: l.rotulo || "", desc: l.descricao || "", price: l.preco, badge: "" }; });
-    return sizes().map(function (s) { return { key: s, label: "", price: x.preco[s], badge: s }; });
-  }
+  function rowsOf(x) { return R.linhas(x, D.tamanhos, x.__d); }
   function isOut(sabor, k) { return (sabor.esgotado || []).indexOf(k) !== -1; }
-  function allOut(sabor) { var r = rowsOf(sabor); return r.length > 0 && r.every(function (l) { return isOut(sabor, l.key); }); }
+  function allOut(sabor) {
+    var r = rowsOf(sabor).filter(function (l) { return !l.head; });
+    return r.length > 0 && r.every(function (l) { return isOut(sabor, l.key); });
+  }
   function mini(foto) { return foto.replace(/^fotos\//, "fotos/mini/").replace(/\.\w+$/, ".jpg"); }
 
   // seções (colecoes) ativas que têm pelo menos um sabor
@@ -48,9 +58,9 @@
     var m = Infinity, mAll = Infinity;
     lista.forEach(function (c) { c.grupos.forEach(function (g) { g.sabores.forEach(function (x) {
       rowsOf(x).forEach(function (r) {
-        if (typeof r.price !== "number") return;
-        if (r.price < mAll) mAll = r.price;
-        if (!isOut(x, r.key) && r.price < m) m = r.price;
+        if (r.head || typeof r.pay !== "number") return;
+        if (r.pay < mAll) mAll = r.pay;
+        if (!isOut(x, r.key) && r.pay < m) m = r.pay;
       });
     }); }); });
     return m === Infinity ? mAll : m;
@@ -72,14 +82,16 @@
   }
 
   function hero() {
-    var c = D.capa;
+    var c = D.capa, d = descCapa();
     var selo = c.selo && c.selo.ativo ? '<span class="chip">' + esc(c.selo.texto) + "</span>" : "";
-    return '<header class="hero"><div class="wrap"><div class="hero-text">' + marcaHtml("hero-logo") + selo +
+    var promo = d ? '<span class="chip promo">' + esc(R.textoDesconto(d)) + (d.aviso ? '<span class="av"> &middot; ' + esc(d.aviso) + "</span>" : "") + "</span>" : "";
+    var seal = d ? '<div class="seal"><b>' + d.percentual + '%</b><span>OFF</span></div>' : "";
+    return '<header class="hero"><div class="wrap"><div class="hero-text">' + marcaHtml("hero-logo") + '<div class="chips">' + selo + promo + "</div>" +
       "<h1>" + esc(c.titulo) + " <span>" + esc(c.destaque) + "</span></h1>" +
       '<p class="lede">' + esc(c.frase) + "</p>" +
       '<p class="from">a partir de <b>' + brlHtml(minPrice()) + "</b></p></div>" +
       '<div class="hero-photo"><img src="' + esc(ver(c.foto)) + '" alt="' + esc(c.fotoDescricao) + '" width="720" height="900" loading="lazy" decoding="async">' +
-      '<div class="stamp">a partir de<strong>' + brlHtml(minPrice()) + "</strong></div></div></div></header>";
+      '<div class="stamp">a partir de<strong>' + brlHtml(minPrice()) + "</strong></div>" + seal + "</div></div></header>";
   }
 
   function sizesBar() {
@@ -98,11 +110,17 @@
   }
 
   function row(sabor, r) {
+    if (r.head) {   // cabeçalho de um sabor (nome + descrição); os tamanhos vêm nas linhas seguintes
+      return '<div class="sub"><span class="lbl">' + esc(r.label) + "</span>" + (r.desc ? '<span class="rd">' + esc(r.desc) + "</span>" : "") + "</div>";
+    }
     var out = isOut(sabor, r.key);
-    var nome = esc(sabor.nome) + (r.label ? " (" + esc(r.label) + ")" : r.badge ? " (" + esc(r.badge) + ")" : "");
+    var det = r.group ? r.group + " " + r.badge : (r.label || r.badge);
+    var nome = esc(sabor.nome) + (det ? " (" + esc(det) + ")" : "");
     // com tamanho P/M: bolinha + preço; com sabor/unidade: nome do sabor (se tiver) e preço
     var semPreco = typeof r.price !== "number";   // preço ainda não definido: "Valor sob consulta"
-    var precoHtml = semPreco ? '<span class="nop">Valor sob consulta</span>' : '<span class="pr">' + brlHtml(r.price) + "</span>";
+    var precoHtml = semPreco ? '<span class="nop">Valor sob consulta</span>'
+      : r.off ? '<span class="pw"><s class="old">' + brlHtml(r.price) + '</s><span class="pr">' + brlHtml(r.pay) + "</span></span>"
+      : '<span class="pr">' + brlHtml(r.price) + "</span>";
     var esq = r.badge
       ? '<span class="sz">' + esc(r.badge) + "</span>" + precoHtml
       : '<span class="vl">' + (r.label ? '<span class="lbl">' + esc(r.label) + "</span>" : "") +
@@ -137,7 +155,9 @@
     } else {
       media = '<div class="tile tile-' + esc(sabor.cartao || "leite") + '" aria-hidden="true"><span>' + esc(sabor.nome) + "</span></div>";
     }
-    var tag = sabor.destaque ? '<span class="tag">' + esc(sabor.destaque) + "</span>" : "";
+    var rotulo = sabor.destaque || sabor.__tag;
+    var tag = rotulo ? '<span class="tag">' + esc(rotulo) + "</span>" : "";
+    if (sabor.__d) tag += '<span class="offtag">' + esc(R.textoDesconto(sabor.__d)) + "</span>";
     var badge = out ? '<span class="out-badge">Esgotado</span>' : "";
     var linhas = rowsOf(sabor);
     var rows = sabor.consultar || !linhas.length ? consulta(sabor) : linhas.map(function (r) { return row(sabor, r); }).join("");
@@ -158,8 +178,10 @@
   }
 
   function secao(c) {
+    var d = R.descontoDe(c);
+    var promo = d ? '<span class="col-off">' + esc(R.textoDesconto(d)) + (d.aviso ? " &middot; " + esc(d.aviso) : "") + "</span>" : "";
     return '<section class="colecao block" id="col-' + esc(c.id) + '" aria-labelledby="t-' + esc(c.id) + '">' +
-      '<div class="col-head"><h2 id="t-' + esc(c.id) + '">' + esc(c.titulo) + "</h2>" + (c.subtitulo ? "<p>" + esc(c.subtitulo) + "</p>" : "") + "</div>" +
+      '<div class="col-head"><h2 id="t-' + esc(c.id) + '">' + esc(c.titulo) + "</h2>" + promo + (c.subtitulo ? "<p>" + esc(c.subtitulo) + "</p>" : "") + "</div>" +
       c.grupos.filter(function (g) { return g.sabores.length; }).map(function (g) { return grupo(c, g); }).join("") + "</section>";
   }
 
@@ -193,15 +215,16 @@
 
   /* ---------- pedido ---------- */
   function render() {
-    var lines = [], items = 0, sub = 0;
+    var lines = [], items = 0, sub = 0, temDesc = false;
     allSabores().forEach(function (x) {
       var pediu = false;
       rowsOf(x).forEach(function (r) {
         var q = cart[key(x.id, r.key)] || 0;
-        if (!q || isOut(x, r.key) || typeof r.price !== "number") return;
-        var price = r.price * q;
-        items += q; sub += price; pediu = true;
-        var det = r.badge || r.label;
+        if (r.head || !q || isOut(x, r.key) || typeof r.pay !== "number") return;
+        var price = R.arred(r.pay * q);
+        items += q; sub = R.arred(sub + price); pediu = true;
+        if (r.off) temDesc = true;
+        var det = r.group ? r.group + " " + r.badge : (r.badge || r.label);
         lines.push("\u2022 " + q + "x " + (x.nomePedido || x.nome) + (det ? " (" + det + ")" : "") + " \u2013 " + brl(price));
       });
       if (pediu && x.notaPedido) lines.push("   " + x.notaPedido);
@@ -215,11 +238,12 @@
         go = document.getElementById("go"), clr = document.getElementById("clear"), msg;
     if (items) {
       total.hidden = false;
-      total.textContent = brl(sub + FEE);
+      total.textContent = brl(R.arred(sub + FEE));
       s.textContent = items + (items > 1 ? " itens" : " item") + " + entrega " + brl(FEE).replace(" ", " ");
       clr.hidden = false;
       msg = "Ol\u00e1, " + D.marca.nome + "! Quero fazer um pedido:\n\n" + lines.join("\n") +
-        "\n\nSubtotal: " + brl(sub) + "\nEntrega: " + brl(FEE) + "\nTotal: " + brl(sub + FEE) +
+        "\n\nSubtotal: " + brl(sub) + (temDesc ? " (já com o desconto do Especial de fim de ano)" : "") +
+        "\nEntrega: " + brl(FEE) + "\nTotal: " + brl(R.arred(sub + FEE)) +
         "\n\nNome:\nEndere\u00e7o:\nDia da entrega:";
     } else {
       total.hidden = true;

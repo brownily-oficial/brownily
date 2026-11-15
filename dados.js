@@ -68,6 +68,7 @@ const DADOS = {
      Cada item tem preço de um destes jeitos:
        preco: { P: 30, M: 60 }                  → tamanhos P e M
        linhas: [{ id, rotulo, preco }, ...]     → sabores ou unidade única (rotulo: "" = sem nome)
+       linhas: [{ id, rotulo, precos: { P: 50, G: 90 }, descricao }]  → sabor com tamanhos próprios
        consultar: true                          → sem preço: mostra "Valor sob consulta"
      esgotado (usa o P/M ou o "id" da linha):
        esgotado: []                  → disponível
@@ -84,6 +85,11 @@ const DADOS = {
    titulo: "Especial de fim de ano",
    aba: "Fim de ano",            // nome curto que aparece na aba do topo (opcional)
    subtitulo: "",
+   // Etiqueta que aparece em TODOS os itens desta seção (como "Especial"). Para tirar: tag: "".
+   tag: "Especial",
+   // DESCONTO por tempo limitado. Os preços abaixo continuam os cheios; o site e as imagens
+   // mostram o preço cheio riscado e o preço com desconto. Para ENCERRAR a promoção: ativo: false.
+   desconto: { ativo: true, percentual: 20, texto: "20% OFF", aviso: "por tempo limitado" },
    grupos: [
     {
       id: "trufados",
@@ -106,7 +112,7 @@ const DADOS = {
           descricao: "Brigadeiro de leite Ninho com Nutella.",                    // CONFIRMAR
           foto: "fotos/ninho.jpg",
           fotoDescricao: "BrownieTone de Ninho com Nutella na caixa com laço vermelho",
-          destaque: "Especial",
+          destaque: null,
           preco: { P: 40, M: 70 },
           esgotado: [],
         },
@@ -124,8 +130,8 @@ const DADOS = {
           id: "doce-de-leite",
           nome: "Doce de leite",
           descricao: "Recheio de doce de leite.",                                 // CONFIRMAR
-          foto: null,
-          cartao: "doce",
+          foto: "fotos/doce-de-leite.jpg",
+          fotoDescricao: "BrownieTone de doce de leite com chocolate granulado por cima",
           destaque: null,
           preco: { P: 30, M: 60 },
           esgotado: [],
@@ -163,12 +169,13 @@ const DADOS = {
           foto: "fotos/sobremesa.jpg",
           fotoDescricao: "Sobremesa de maracujá trufado em pote com laço vermelho",
           destaque: null,
-          // Preço ainda não definido: preco: null mostra "Valor sob consulta" + botão Perguntar. CONFIRMAR os preços.
+          // Cada sabor tem preço nos tamanhos P e G (precos). CONFIRMAR o peso de P e G (ainda não informado).
           linhas: [
-            { id: "maracuja",    rotulo: "Maracujá trufado",  preco: null, descricao: "Brigadeiro de chocolate, pedaços de brownie e finalizados com brigadeiro de maracujá." },
-            { id: "dois-amores", rotulo: "Dois amores",       preco: null, descricao: "Brigadeiro de chocolate, pedaços de brownie e finalizados com brigadeiro de Ninho." },
-            { id: "ninho",       rotulo: "Ninho com Nutella", preco: null, descricao: "Brigadeiro de Ninho com Nutella com pedaços de brownie." },
+            { id: "maracuja",    rotulo: "Maracujá trufado",  precos: { P: 50, G: 90 },  descricao: "Brigadeiro de chocolate, pedaços de brownie e finalizados com brigadeiro de maracujá." },
+            { id: "dois-amores", rotulo: "Dois amores",       precos: { P: 50, G: 90 },  descricao: "Brigadeiro de chocolate, pedaços de brownie e finalizados com brigadeiro de Ninho." },
+            { id: "ninho",       rotulo: "Ninho com Nutella", precos: { P: 80, G: 130 }, descricao: "Brigadeiro de Ninho com Nutella com pedaços de brownie." },
           ],
+          // para esgotar só um tamanho de um sabor: esgotado: ["maracuja-G"]
           esgotado: [],
         },
       ],
@@ -198,14 +205,14 @@ const DADOS = {
           esgotado: [],
         },
         {
-          id: "copo-dois-amores",
-          nome: "Dois amores",
-          nomePedido: "Brownie no copo – Dois amores",
+          id: "copo-doce-de-leite",
+          nome: "Brigadeiro de doce de leite",
+          nomePedido: "Brownie no copo – Brigadeiro de doce de leite",
           descricao: "",                                                          // CONFIRMAR (sem descrição ainda)
-          foto: "fotos/copo-dois-amores.jpg",                                     // CONFIRMAR (qual foto é de qual copo)
-          fotoDescricao: "Brownie no copo de dois amores",
+          foto: "fotos/copo-doce-de-leite.jpg",
+          fotoDescricao: "Brownie no copo de brigadeiro de doce de leite",
           destaque: null,
-          linhas: [{ id: "un", rotulo: "", preco: 15 }],
+          linhas: [{ id: "un", rotulo: "", preco: 15 }],                          // CONFIRMAR: usei o preço do Dois amores, que saiu do lugar
           esgotado: [],
         },
         {
@@ -258,14 +265,15 @@ const DADOS = {
             { id: "brigadeiro", rotulo: "Brigadeiro", preco: 10 },
             { id: "ninho",      rotulo: "Ninho",      preco: 10 },
             { id: "dois-amores", rotulo: "Dois amores", preco: 10 },
+            { id: "doce-de-leite", rotulo: "Doce de leite", preco: 10 },          // CONFIRMAR: mesmo preço dos outros sabores
           ],
           esgotado: [],
         },
         {
           id: "quarteto-brownie",
           nome: "Quarteto Brownie",
-          descricao: "Escolha 4 sabores entre Maracujá, Brigadeiro, Ninho e Dois amores. Pode ser todos de um único sabor, dois de cada ou cada um de um sabor.",
-          notaPedido: "Sabores (escolha 4 entre Maracujá, Brigadeiro, Ninho e Dois amores): ",
+          descricao: "Escolha 4 sabores entre Maracujá, Brigadeiro, Ninho, Dois amores e Doce de leite. Pode ser todos de um único sabor, dois de cada ou cada um de um sabor.",
+          notaPedido: "Sabores (escolha 4 entre Maracujá, Brigadeiro, Ninho, Dois amores e Doce de leite): ",
           foto: "fotos/quarteto.jpg",
           fotoDescricao: "Caixa com quatro brownies de sabores variados",
           destaque: null,
