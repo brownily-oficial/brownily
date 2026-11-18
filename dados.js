@@ -46,7 +46,7 @@ const DADOS = {
     destaque: "trufado",
     frase: "Brownie alto e recheado, feito à mão. Escolha o sabor, o tamanho e peça direto pelo WhatsApp.", // CONFIRMAR
     foto: "fotos/brigadeiro.jpg",
-    fotoDescricao: "BrownieTone de brigadeiro em caixa de presente com laço vermelho",
+    fotoDescricao: "BrownieTone de brigadeiro com granulado de chocolate",
   },
 
   /* ---------- Tamanhos ---------- */
@@ -101,7 +101,7 @@ const DADOS = {
           nome: "Brigadeiro",
           descricao: "Recheado e coberto com brigadeiro de chocolate.",          // CONFIRMAR
           foto: "fotos/brigadeiro.jpg",
-          fotoDescricao: "BrownieTone de brigadeiro na caixa com laço vermelho",
+          fotoDescricao: "BrownieTone de brigadeiro com granulado de chocolate",
           destaque: null,
           preco: { P: 30, M: 60 },
           esgotado: [],
@@ -111,7 +111,7 @@ const DADOS = {
           nome: "Ninho com Nutella",
           descricao: "Brigadeiro de leite Ninho com Nutella.",                    // CONFIRMAR
           foto: "fotos/ninho.jpg",
-          fotoDescricao: "BrownieTone de Ninho com Nutella na caixa com laço vermelho",
+          fotoDescricao: "BrownieTone de Ninho com Nutella, coberto com brigadeiro branco e fios de Nutella",
           destaque: null,
           preco: { P: 40, M: 70 },
           esgotado: [],
