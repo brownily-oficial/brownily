@@ -25,7 +25,7 @@ const DADOS = {
 
   /* ---------- Endereço do site (usado no QR Code) ---------- */
   site: {
-    url: "https://pedronicoliveira-gif.github.io/brownily/",
+    url: "https://brownily-oficial.github.io/brownily/",
   },
 
   /* ---------- Contato e entrega ---------- */
