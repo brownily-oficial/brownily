@@ -28,9 +28,15 @@ function conferirDados() {
     } else if (!s.consultar) {
       Object.keys(DADOS.tamanhos).forEach(t => { if (typeof s.preco[t] !== "number") erros.push(`${s.nome}: falta o preço do tamanho ${t}`); });
     }
+    if (s.atacado && !(s.atacado.acimaDe > 0 && typeof s.atacado.preco === "number")) erros.push(`${s.nome}: atacado precisa de acimaDe e preco`);
     if (s.foto && !fs.existsSync(path.join(RAIZ, s.foto))) erros.push(`${s.nome}: a foto ${s.foto} não existe`);
   })));
   if (!DADOS.colecoes.some(c => c.ativa !== false && c.grupos.some(g => g.sabores.length))) erros.push("Nenhuma seção ativa com sabores.");
+  const pr = DADOS.promocao;
+  if (pr && pr.ativo) {
+    if (!(pr.percentual > 0 && pr.percentual < 100)) erros.push("promocao: percentual inválido");
+    ["inicio", "fim"].forEach(k => { if (pr[k] && !/^\d{4}-\d{2}-\d{2}$/.test(pr[k])) erros.push(`promocao: ${k} deve ser AAAA-MM-DD`); });
+  }
   if (!fs.existsSync(path.join(RAIZ, DADOS.capa.foto))) erros.push(`Foto da capa não existe: ${DADOS.capa.foto}`);
   if (erros.length) { console.error("\nPROBLEMAS NO dados.js:\n- " + erros.join("\n- ")); process.exit(1); }
 }

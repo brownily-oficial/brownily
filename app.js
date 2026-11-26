@@ -7,12 +7,13 @@
   var cart = {};
   // marca cada item com o desconto e a etiqueta da sua seção
   D.colecoes.forEach(function (c) {
-    var d = R.descontoDe(c);
-    c.grupos.forEach(function (g) { g.sabores.forEach(function (x) { x.__d = d; x.__tag = c.tag || ""; }); });
+    var d = R.descontoDe(c, D);
+    c.grupos.forEach(function (g) { g.sabores.forEach(function (x) { x.__d = R.descontoDoItem(x, d); x.__tag = c.tag || ""; }); });
   });
+  var PROMO = R.promocaoAtiva(D);   // promoção geral (ex.: Black Friday) valendo hoje
   function descCapa() {
     var c = D.colecoes.filter(function (k) { return k.id === D.capa.colecao; })[0];
-    return c && c.ativa !== false ? R.descontoDe(c) : null;
+    return c && c.ativa !== false ? R.descontoDe(c, D) : null;
   }
   // versão dos arquivos (vem do ?v= deste script): garante que o navegador pegue sempre a versão nova
   var V = (function () { var s = document.currentScript, m = s && /[?&]v=(\w+)/.exec(s.src); return m ? m[1] : ""; })();
@@ -81,11 +82,21 @@
     return '<span class="wordmark ' + cls + '">' + esc(n.slice(0, 4)) + "<b>" + esc(n.slice(4)) + "</b></span>";
   }
 
+  // faixa no topo enquanto a promoção geral estiver valendo
+  function faixaPromo() {
+    if (!PROMO) return "";
+    // itens fora da promoção são citados na própria faixa
+    var fora = allSabores().filter(function (x) { return x.semDesconto; }).map(function (x) { return x.nome; });
+    return '<div class="bf" role="note"><strong>' + esc(PROMO.nome) + "</strong><span><b>" + PROMO.percentual + "% OFF</b> em todo o cardápio" +
+      (PROMO.aviso ? " &middot; " + esc(PROMO.aviso) : "") + "</span>" +
+      (fora.length ? "<small>Exceto " + esc(fora.join(", ")) + "</small>" : "") + "</div>";
+  }
+
   function hero() {
     var c = D.capa, d = descCapa();
     var selo = c.selo && c.selo.ativo ? '<span class="chip">' + esc(c.selo.texto) + "</span>" : "";
     var promo = d ? '<span class="chip promo">' + esc(R.textoDesconto(d)) + (d.aviso ? '<span class="av"> &middot; ' + esc(d.aviso) + "</span>" : "") + "</span>" : "";
-    var seal = d ? '<div class="seal"><b>' + d.percentual + '%</b><span>OFF</span></div>' : "";
+    var seal = d ? '<div class="seal"><b>' + d.percentual + '%</b><span>OFF</span>' + (d.promo ? "<small>" + esc(d.nome) + "</small>" : "") + "</div>" : "";
     return '<header class="hero"><div class="wrap"><div class="hero-text">' + marcaHtml("hero-logo") + '<div class="chips">' + selo + promo + "</div>" +
       "<h1>" + esc(c.titulo) + " <span>" + esc(c.destaque) + "</span></h1>" +
       '<p class="lede">' + esc(c.frase) + "</p>" +
@@ -134,8 +145,18 @@
     return '<div class="' + cls + '">' + esq +
       '<div class="step" data-id="' + esc(sabor.id) + '" data-size="' + esc(r.key) + '">' +
       '<button type="button" class="b minus" aria-label="Tirar um ' + nome + '" disabled>&minus;</button>' +
-      '<output class="q" aria-live="polite">0</output>' +
+      // itens com preço de atacado deixam digitar a quantidade (ex.: 30 lembrancinhas)
+      (sabor.atacado
+        ? '<input class="q" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="0" aria-label="Quantidade de ' + nome + '">'
+        : '<output class="q" aria-live="polite">0</output>') +
       '<button type="button" class="b plus" aria-label="Adicionar um ' + nome + '">+</button></div></div>';
+  }
+
+  // aviso do preço de atacado, abaixo das linhas de preço
+  function atacadoHtml(sabor) {
+    var a = sabor.atacado;
+    if (!a) return "";
+    return '<p class="atac">Acima de ' + a.acimaDe + " unidades: <b>" + brlHtml(R.pagar(a.preco, sabor.__d)) + "</b> cada</p>";
   }
 
   // item sem preço definido: leva o cliente a perguntar o valor no WhatsApp
@@ -163,7 +184,7 @@
     var rows = sabor.consultar || !linhas.length ? consulta(sabor) : linhas.map(function (r) { return row(sabor, r); }).join("");
     return '<article class="card' + (wide ? " wide" : "") + (out ? " out" : "") + '">' +
       '<div class="media">' + media + tag + badge + "</div>" +
-      '<div class="body"><h3>' + esc(sabor.nome) + "</h3>" + (sabor.descricao ? '<p class="desc">' + esc(sabor.descricao) + "</p>" : "") + rows + "</div></article>";
+      '<div class="body"><h3>' + esc(sabor.nome) + "</h3>" + (sabor.descricao ? '<p class="desc">' + esc(sabor.descricao) + "</p>" : "") + rows + atacadoHtml(sabor) + "</div></article>";
   }
 
   function grupo(c, g) {
@@ -178,7 +199,7 @@
   }
 
   function secao(c) {
-    var d = R.descontoDe(c);
+    var d = R.descontoDe(c, D);
     var promo = d ? '<span class="col-off">' + esc(R.textoDesconto(d)) + (d.aviso ? " &middot; " + esc(d.aviso) : "") + "</span>" : "";
     return '<section class="colecao block" id="col-' + esc(c.id) + '" aria-labelledby="t-' + esc(c.id) + '">' +
       '<div class="col-head"><h2 id="t-' + esc(c.id) + '">' + esc(c.titulo) + "</h2>" + promo + (c.subtitulo ? "<p>" + esc(c.subtitulo) + "</p>" : "") + "</div>" +
@@ -221,18 +242,31 @@
       rowsOf(x).forEach(function (r) {
         var q = cart[key(x.id, r.key)] || 0;
         if (r.head || !q || isOut(x, r.key) || typeof r.pay !== "number") return;
-        var price = R.arred(r.pay * q);
+        var unit = R.precoUnidade(x, r, q);        // pre\u00e7o de atacado quando a quantidade passa do limite
+        var price = R.arred(unit * q);
         items += q; sub = R.arred(sub + price); pediu = true;
-        if (r.off) temDesc = true;
+        if (r.off) temDesc = x.__d;
         var det = r.group ? r.group + " " + r.badge : (r.badge || r.label);
-        lines.push("\u2022 " + q + "x " + (x.nomePedido || x.nome) + (det ? " (" + det + ")" : "") + " \u2013 " + brl(price));
+        lines.push("\u2022 " + q + "x " + (x.nomePedido || x.nome) + (det ? " (" + det + ")" : "") + " \u2013 " + brl(price) +
+          (unit !== r.pay ? " (" + brl(unit) + " cada)" : ""));
       });
       if (pediu && x.notaPedido) lines.push("   " + x.notaPedido);
     });
     document.querySelectorAll(".step").forEach(function (el) {
       var q = cart[key(el.dataset.id, el.dataset.size)] || 0;
-      el.querySelector(".q").textContent = q;
+      var campo = el.querySelector(".q");
+      if (campo.tagName === "INPUT") { if (campo !== document.activeElement) campo.value = q; }
+      else campo.textContent = q;
       el.querySelector(".minus").disabled = q === 0;
+    });
+    // destaca o aviso de atacado quando ele já está valendo
+    document.querySelectorAll(".card").forEach(function (c) {
+      var aviso = c.querySelector(".atac"), campo = c.querySelector("input.q");
+      if (!aviso || !campo) return;
+      var id = c.querySelector(".step").dataset.id;
+      var x = allSabores().filter(function (k) { return k.id === id; })[0];
+      var q = 0; rowsOf(x).forEach(function (r) { q = Math.max(q, cart[key(id, r.key)] || 0); });
+      aviso.classList.toggle("on", q > x.atacado.acimaDe);
     });
     var total = document.getElementById("total"), s = document.getElementById("sub"),
         go = document.getElementById("go"), clr = document.getElementById("clear"), msg;
@@ -242,7 +276,7 @@
       s.textContent = items + (items > 1 ? " itens" : " item") + " + entrega " + brl(FEE).replace(" ", " ");
       clr.hidden = false;
       msg = "Ol\u00e1, " + D.marca.nome + "! Quero fazer um pedido:\n\n" + lines.join("\n") +
-        "\n\nSubtotal: " + brl(sub) + (temDesc ? " (já com o desconto do Especial de fim de ano)" : "") +
+        "\n\nSubtotal: " + brl(sub) + (temDesc ? " (já com o desconto " + (temDesc.promo ? "de " + temDesc.nome + ", " + temDesc.texto : "do Especial de fim de ano") + ")" : "") +
         "\nEntrega: " + brl(FEE) + "\nTotal: " + brl(R.arred(sub + FEE)) +
         "\n\nNome:\nEndere\u00e7o:\nDia da entrega:";
     } else {
@@ -263,7 +297,7 @@
 
   function start() {
     var lista = secoes();
-    document.getElementById("app").innerHTML = hero() + sizesBar() + tabs(lista) +
+    document.getElementById("app").innerHTML = faixaPromo() + hero() + sizesBar() + tabs(lista) +
       '<main class="wrap">' + lista.map(secao).join("") + info() + "</main>" + footer() + bar();
 
     document.addEventListener("click", function (e) {
@@ -281,8 +315,23 @@
       if (!b) return;
       var st = b.closest(".step"), k = key(st.dataset.id, st.dataset.size);
       var q = (cart[k] || 0) + (b.classList.contains("plus") ? 1 : -1);
-      cart[k] = Math.max(0, Math.min(20, q));
+      cart[k] = Math.max(0, Math.min(st.querySelector("input.q") ? 200 : 20, q));
       render();
+    });
+    // quantidade digitada (itens com preço de atacado)
+    document.addEventListener("input", function (e) {
+      if (!e.target.matches("input.q")) return;
+      var st = e.target.closest(".step"), limpo = e.target.value.replace(/\D/g, "");
+      var q = Math.min(200, parseInt(limpo, 10) || 0);
+      e.target.value = limpo === "" ? "" : q;
+      cart[key(st.dataset.id, st.dataset.size)] = q;
+      render();
+    });
+    document.addEventListener("focusin", function (e) { if (e.target.matches("input.q")) e.target.select(); });
+    document.addEventListener("focusout", function (e) {
+      if (!e.target.matches("input.q")) return;
+      var st = e.target.closest(".step");
+      e.target.value = cart[key(st.dataset.id, st.dataset.size)] || 0;
     });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechaFoto(); });
     document.getElementById("clear").addEventListener("click", function () { cart = {}; render(); });

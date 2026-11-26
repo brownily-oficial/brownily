@@ -17,6 +17,7 @@ const FOTOS = [
   { de: "individual.jpg",      para: "individual.jpg",          foco: 0.54 },
   { de: "quarteto.jpg",        para: "quarteto.jpg",            foco: 0.44 },
   { de: "sobremesa.jpg",       para: "sobremesa.jpg",           foco: 0.6 },
+  { de: "lembrancinha.jpg",    para: "lembrancinha.jpg",        foco: 0.5 },
   { de: "brigadeiro.jpg",      para: "brigadeiro.jpg",          foco: 0.4 },
   { de: "ninho.jpg",           para: "ninho.jpg",               foco: 0.35 },
   { de: "doce-de-leite.jpg",   para: "doce-de-leite.jpg",       foco: 0.5 },

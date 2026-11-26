@@ -49,6 +49,21 @@ const DADOS = {
     fotoDescricao: "BrownieTone de brigadeiro com granulado de chocolate",
   },
 
+  /* ---------- Promoção geral (vale para TODO o cardápio) ----------
+     Começa e termina sozinha no site, pelas datas (dias inclusivos, horário do Brasil).
+     Não soma com o desconto de uma seção: vale o maior.
+     Depois que acabar, rode "atualizar" para tirar os selos das imagens e do PDF.
+     Para cancelar antes: ativo: false. */
+  promocao: {
+    ativo: true,
+    nome: "Black Friday",
+    percentual: 20,
+    inicio: "2026-11-26",
+    fim: "2026-11-28",
+    aviso: "até sábado, 28/11",
+    curto: "Black Friday até 28/11",
+  },
+
   /* ---------- Tamanhos ---------- */
   tamanhos: {
     P: "aprox. 250g",
@@ -77,6 +92,8 @@ const DADOS = {
        esgotado: ["ninho"]           → só aquele sabor (linha) esgotado
      foto: null                      → mostra um cartão com o nome (sem foto)
      notaPedido: "texto"             → texto que vai junto na mensagem do WhatsApp
+     atacado: { acimaDe: 15, preco: 9 } → preço por unidade quando a quantidade passa de 15
+     semDesconto: true               → item que não entra em nenhuma promoção
   ---------------------------------- */
   colecoes: [
   {
@@ -278,6 +295,20 @@ const DADOS = {
           fotoDescricao: "Caixa com quatro brownies de sabores variados",
           destaque: null,
           linhas: [{ id: "un", rotulo: "", preco: 34.90 }],
+          esgotado: [],
+        },
+        {
+          id: "brownie-lembrancinha",
+          nome: "Brownie lembrancinha",
+          descricao: "Topping à escolha do cliente.",
+          notaPedido: "Topping escolhido: ",
+          foto: "fotos/lembrancinha.jpg",
+          fotoDescricao: "Brownie lembrancinha em embalagem transparente com laço vermelho",
+          destaque: null,
+          linhas: [{ id: "un", rotulo: "", preco: 10 }],
+          // preço de atacado: acima de 15 unidades (16 ou mais) cada uma sai por R$ 9
+          atacado: { acimaDe: 15, preco: 9 },
+          semDesconto: true,           // não entra em promoção (nem Black Friday); o único desconto é o de quantidade
           esgotado: [],
         },
       ],

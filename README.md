@@ -57,6 +57,14 @@ A seção do Especial de fim de ano tem, no `dados.js`:
 - `desconto: { ativo: true, percentual: 20, ... }`: mostra o preço cheio riscado e o preço com desconto no site, nas imagens e no PDF, com selos de "20% OFF". Os preços no arquivo continuam os cheios. **Para encerrar a promoção:** peça "tira o desconto" (ou `ativo: false`).
 - `tag: "Especial"`: a etiqueta que aparece em todos os itens da seção. Para tirar: `tag: ""`.
 
+## Promoção em todo o cardápio (ex.: Black Friday)
+
+No `dados.js`, o bloco `promocao` aplica um desconto em **todos** os itens, com faixa no topo do site. Ele **começa e termina sozinho no site**, pelas datas `inicio` e `fim` (dias inclusivos, horário do Brasil). Não soma com o desconto de uma seção: vale o maior. As imagens e o PDF são fotos do momento: depois que a promoção acabar, rode `atualizar.bat` para tirar os selos deles.
+
+## Preço de atacado e item fora de promoção
+
+Em um item do `dados.js`: `atacado: { acimaDe: 15, preco: 9 }` cobra R$ 9 por unidade quando a quantidade passa de 15 (o cliente pode digitar a quantidade no site). `semDesconto: true` deixa o item fora de qualquer promoção; a faixa e a capa avisam "exceto ...".
+
 ## Regras rápidas
 
 - Esgotado: `esgotado: ["M"]` (só o M), `esgotado: ["P", "M"]` (sabor todo) ou `esgotado: []` (disponível).

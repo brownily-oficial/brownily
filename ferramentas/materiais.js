@@ -17,13 +17,18 @@ const brl = v => { const n = Number(v); return "R$&nbsp;" + (n % 1 === 0 ? n : n
 const R = require("../regras.js");
 const fora = (x, k) => (x.esgotado || []).includes(k);
 // marca cada item com o desconto e a etiqueta da sua seção
-D.colecoes.forEach(c => { const d = R.descontoDe(c); c.grupos.forEach(g => g.sabores.forEach(x => { x.__d = d; x.__tag = c.tag || ""; })); });
+const PROMO = R.promocaoAtiva(D);   // promoção geral (ex.: Black Friday) valendo no dia em que os materiais são gerados
+D.colecoes.forEach(c => { const d = R.descontoDe(c, D);c.grupos.forEach(g => g.sabores.forEach(x => { x.__d = R.descontoDoItem(x, d); x.__tag = c.tag || ""; })); });
+// itens fora de promoção são citados junto das chamadas "em todo o cardápio"
+const FORA = D.colecoes.filter(c => c.ativa !== false).flatMap(c => c.grupos.flatMap(g => g.sabores)).filter(x => x.semDesconto).map(x => x.nome);
+const EXCETO = FORA.length ? `exceto ${FORA.join(", ")}` : "";
 // linhas de um item (P/M, sabores, ou sabor com P e G), já com o desconto calculado
 const linhasDe = x => R.linhas(x, D.tamanhos, x.__d);
 const tudoFora = x => { const l = linhasDe(x).filter(r => !r.head); return l.length > 0 && l.every(r => fora(x, r.key)); };
 const secoes = () => D.colecoes.filter(c => c.ativa !== false && c.grupos.some(g => g.sabores.length));
-const descCapa = () => { const c = D.colecoes.find(k => k.id === D.capa.colecao); return c && c.ativa !== false ? R.descontoDe(c) : null; };
-const selosCapa = () => { const d = descCapa(); return d ? `<div class="chip promo">${esc(R.textoDesconto(d))}${d.aviso ? " &middot; " + esc(d.aviso) : ""}</div>` : ""; };
+const descCapa = () => { const c = D.colecoes.find(k => k.id === D.capa.colecao); return c && c.ativa !== false ? R.descontoDe(c, D) : null; };
+const selosCapa = () => { const d = descCapa(); return d ? `<div class="chip promo">${d.promo ? esc(d.nome + " · " + R.textoDesconto(d)) : esc(R.textoDesconto(d)) + (d.aviso ? " &middot; " + esc(d.aviso) : "")}</div>` : ""; };
+const seloRedondo = () => { const d = descCapa(); return d ? `<div class="seal"><b>${d.percentual}%</b><span>OFF</span>${d.promo ? `<small>${esc(d.nome)}</small>` : ""}</div>` : ""; };
 const menorPreco = () => {
   const alvo = secoes().filter(c => !D.capa.colecao || c.id === D.capa.colecao);
   const rows = alvo.flatMap(c => c.grupos.flatMap(g => g.sabores.flatMap(x => linhasDe(x).filter(r => !r.head && typeof r.pay === "number").map(r => ({ r, out: fora(x, r.key) })))));
@@ -80,7 +85,7 @@ h1,h2,h3{font-family:var(--fd);font-weight:400;margin:0;line-height:1}
 .lista{flex:1;min-height:0;padding:26px 70px 0;display:flex;flex-direction:column;gap:18px}
 .pill{align-self:flex-start;display:flex;align-items:center;white-space:nowrap;background:linear-gradient(120deg,var(--purple),var(--ink2));color:#fff;font-family:var(--fd);font-size:36px;padding:10px 24px 12px 34px;border-radius:999px}
 .grupo{font-size:54px;color:var(--choc);margin:2px 0 -6px}
-.item{display:flex;min-height:330px;flex:1 0 auto;background:#fff;border:3px solid var(--line);border-radius:36px;overflow:hidden;position:relative}
+.item{display:flex;min-height:330px;max-height:640px;flex:1 0 auto;background:#fff;border:3px solid var(--line);border-radius:36px;overflow:hidden;position:relative}
 .item .m{position:relative;width:304px;align-self:stretch;flex:none;background:var(--choc2)}
 .item .m img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .item .tag{position:absolute;top:18px;left:18px;background:var(--purple);color:#fff;font-weight:900;font-size:22px;letter-spacing:.12em;text-transform:uppercase;padding:8px 18px;border-radius:999px;z-index:2}
@@ -127,6 +132,15 @@ h1,h2,h3{font-family:var(--fd);font-weight:400;margin:0;line-height:1}
 .seal{position:absolute;top:-34px;right:-34px;width:210px;height:210px;border-radius:50%;background:#ffe9c7;color:var(--choc);display:grid;place-content:center;text-align:center;transform:rotate(10deg);box-shadow:0 18px 40px rgba(0,0,0,.45);border:9px solid var(--purple);line-height:1;z-index:2}
 .seal b{font-family:var(--fd);font-weight:400;font-size:72px}
 .seal span{font-weight:900;font-size:32px;letter-spacing:.12em}
+.seal small{display:block;font-weight:900;font-size:19px;letter-spacing:.05em;text-transform:uppercase;margin-top:4px}
+.capa .rodape.bfr{background:#0d0907;color:#fff7ec;border-top:8px solid var(--purple)}
+.capa .rodape.bfr small{color:#ffe9c7;font-size:25px;line-height:1.5;opacity:1}
+.pre.var .pw{flex-direction:row;align-items:baseline;gap:14px}
+.pre .lb + .pw{margin-left:auto}
+.item .atac{align-self:flex-start;font-size:25px;font-weight:800;color:var(--ink2);background:var(--soft);border-radius:18px;padding:10px 20px}
+.capa .rodape.bfr small i{display:inline;font-style:normal;font-size:19px;letter-spacing:.08em;color:#cbbfb4}
+.lista.poucos .item{max-height:600px;flex:1 1 600px}
+.lista.poucos .item .m{width:460px}
 .pill .off{margin-left:18px;background:#ffe9c7;color:var(--choc);font-family:var(--fb);font-weight:900;font-size:21px;letter-spacing:.05em;text-transform:uppercase;padding:5px 14px;border-radius:999px}
 .item.out{background:#f1ebe3;border-color:#e3d9cb}
 .item.out .m img,.item.out .tile{filter:grayscale(1) opacity(.55)}
@@ -172,8 +186,8 @@ function paginaCapa() {
     <div class="chips rel">${c.selo && c.selo.ativo ? `<span class="chip">${esc(c.selo.texto)}</span>` : ""}${selosCapa().replace("div", "span").replace("/div", "/span")}</div>
     <h1 class="rel">${esc(c.titulo)} <span>${esc(c.destaque)}</span></h1>
     <p class="lede rel">${esc(c.frase)}</p>
-    <div class="foto rel"><img src="../${esc(c.foto)}" alt=""><div class="stamp">a partir de<strong>${brl(menorPreco())}</strong></div>${descCapa() ? `<div class="seal"><b>${descCapa().percentual}%</b><span>OFF</span></div>` : ""}</div>
-    <div class="rodape"><div><small>Peça pelo WhatsApp</small>${esc(D.contato.whatsappTexto)}</div></div>
+    <div class="foto rel"><img src="../${esc(c.foto)}" alt=""><div class="stamp">a partir de<strong>${brl(menorPreco())}</strong></div>${seloRedondo()}</div>
+    <div class="rodape${PROMO ? " bfr" : ""}"><div><small>${PROMO ? `${esc(PROMO.percentual)}% OFF em todo o cardápio &middot; ${esc(PROMO.aviso || "")}${EXCETO ? `<br><i>${esc(EXCETO)}</i>` : ""}` : "Peça pelo WhatsApp"}</small>${PROMO ? "WhatsApp " : ""}${esc(D.contato.whatsappTexto)}</div></div>
   </section>`;
 }
 
@@ -202,7 +216,8 @@ function item(x) {
   const selos = (rotulo ? `<span class="tag">${esc(rotulo)}</span>` : "") + (x.__d ? `<span class="offtag">${esc(R.textoDesconto(x.__d))}</span>` : "");
   return `<div class="item${out ? " out" : ""}"><div class="m">${midia}${selos}${out ? '<span class="selo-out">Esgotado</span>' : ""}</div>
     <div class="t"><h3>${esc(x.nome)}</h3>${x.descricao ? `<p>${esc(x.descricao)}</p>` : ""}${
-      x.consultar || !linhasDe(x).length ? '<div class="pre"><span class="lb">Valor sob consulta</span></div>' : linhasHtml(x)}</div></div>`;
+      x.consultar || !linhasDe(x).length ? '<div class="pre"><span class="lb">Valor sob consulta</span></div>' : linhasHtml(x)}${
+      x.atacado ? `<div class="atac">Acima de ${x.atacado.acimaDe} unidades: <b>${brl(R.pagar(x.atacado.preco, x.__d))}</b> cada</div>` : ""}</div></div>`;
 }
 
 // Sabores com P e G (cabeçalho + 2 tamanhos) viram UMA linha: nome e descrição à esquerda, os dois preços à direita.
@@ -246,8 +261,9 @@ function paginasCardapio() {
     let corpo = "", col = null, grp = null;
     lista.forEach(({ c, g, x }) => {
       if (c.id !== col) {
-        const d = R.descontoDe(c);
-        corpo += `<div class="pill">${esc(c.titulo)}${d ? `<span class="off">${esc(R.textoDesconto(d))}${d.aviso ? " &middot; " + esc(d.aviso) : ""}</span>` : ""}</div>`;
+        const d = R.descontoDe(c, D);
+        const extra = d ? (d.curto || d.aviso) : "";
+        corpo += `<div class="pill">${esc(c.titulo)}${d ? `<span class="off">${esc(R.textoDesconto(d))}${extra ? " &middot; " + esc(extra) : ""}</span>` : ""}</div>`;
         col = c.id; grp = null;
       }
       if (g.id !== grp) { if (g.titulo) corpo += `<h2 class="grupo">${esc(g.titulo)}</h2>`; grp = g.id; }
@@ -255,7 +271,7 @@ function paginasCardapio() {
     });
     return `<section class="pg light" data-nome="cardapio-${n + 1}">
       <div class="cab">${marca()}${usaTamanhos(lista) ? tams : ""}</div>
-      <div class="lista">${corpo}</div>
+      <div class="lista${lista.length <= 2 && !lista.some(({ x }) => linhasDe(x).length > 2) ? " poucos" : ""}">${corpo}</div>
       <div class="pe">Peça pelo WhatsApp <b>${esc(D.contato.whatsappTexto)}</b></div>
     </section>`;
   }).join("");
@@ -279,7 +295,7 @@ function paginaInfo(urlCurta) {
 function paginaCompartilhar() {
   const c = D.capa;
   return `<section class="pg marrom dots" style="width:1200px;height:630px;flex-direction:row;align-items:center;padding:0 70px;gap:50px" data-nome="compartilhar">
-    <div class="rel" style="flex:1">${marca().replace('class="logo ', 'style="height:180px" class="logo ')}${c.selo && c.selo.ativo ? `<div style="margin-top:26px;display:flex;gap:12px"><span class="chip" style="font-size:20px;padding:8px 20px">${esc(c.selo.texto)}</span>${descCapa() ? `<span class="chip promo" style="font-size:20px;padding:8px 20px">${esc(R.textoDesconto(descCapa()))}</span>` : ""}</div>` : ""}
+    <div class="rel" style="flex:1">${marca().replace('class="logo ', 'style="height:180px" class="logo ')}${c.selo && c.selo.ativo ? `<div style="margin-top:26px;display:flex;gap:12px"><span class="chip" style="font-size:20px;padding:8px 20px">${esc(c.selo.texto)}</span>${descCapa() ? `<span class="chip promo" style="font-size:20px;padding:8px 20px">${esc((descCapa().promo ? descCapa().nome + " · " : "") + R.textoDesconto(descCapa()))}</span>` : ""}</div>` : ""}
       <h1 style="font-size:78px;line-height:1.1;margin-top:18px;color:var(--ondark)">${esc(c.titulo)}<br><span style="color:var(--lilac)">${esc(c.destaque)}</span></h1>
       <div style="margin-top:20px;font-size:30px;color:var(--ondark2);font-weight:800">Peça pelo WhatsApp &middot; ${esc(D.marca.cidade)}</div></div>
     <div class="rel" style="width:400px;flex:none"><img src="../${esc(c.foto)}" style="display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:36px;transform:rotate(3deg);box-shadow:0 30px 60px rgba(0,0,0,.5)" alt=""></div>
@@ -291,7 +307,8 @@ function atualizarIndex() {
   const arq = path.join(RAIZ, "index.html");
   const base = D.site.url.replace(/\/?$/, "/");
   const titulo = `${D.marca.nome} · ${D.marca.slogan} — Cardápio`;
-  const desc = `Cardápio ${D.marca.nome}: ${D.capa.titulo} ${D.capa.destaque}, feito à mão em ${D.marca.cidade}. Monte seu pedido e peça pelo WhatsApp.`;
+  const chamada = PROMO ? `${PROMO.nome}: ${PROMO.percentual}% OFF em todo o cardápio${EXCETO ? ` (${EXCETO})` : ""}, ${PROMO.aviso || ""}. ` : "";
+  const desc = `${chamada}Cardápio ${D.marca.nome}: ${D.capa.titulo} ${D.capa.destaque}, feito à mão em ${D.marca.cidade}. Monte seu pedido e peça pelo WhatsApp.`;
   const bloco = `<!--COMPARTILHAR-->
 <meta name="description" content="${esc(desc)}">
 <meta property="og:type" content="website">
